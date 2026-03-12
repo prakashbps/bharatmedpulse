@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>ECG Simulator · Bharat Med Pulse</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --black:#060809;--panel:#0f1519;--metal:#131c24;
+  --border:#1c2a36;--border2:#243340;
+  --red:#ff4444;--yellow:#ffab00;--green:#00e676;--blue:#4488ff;
+  --text:#c0d0dc;--dim:#3d5566;--mid:#6a8a9a;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{background:var(--black);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;-webkit-overflow-scrolling:touch;}
+.wrap{max-width:900px;margin:0 auto;padding:12px;}
+
+/* HEADER */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;
+  background:linear-gradient(135deg,var(--panel),var(--metal));
+  border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:2px solid var(--red);}
+.brand{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--red);letter-spacing:3px;opacity:.7;}
+.htitle{font-weight:700;font-size:19px;color:#fff;letter-spacing:2px;margin-top:2px;}
+.htitle span{color:var(--red);}
+.hright{display:flex;flex-direction:column;align-items:flex-end;gap:3px;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red);animation:blink 1s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+.badge{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--dim);border:1px solid var(--border2);padding:2px 6px;border-radius:2px;}
+
+/* CHIPS */
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-top:none;}
+.chip{background:var(--panel);padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.clbl{font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--dim);letter-spacing:1px;}
+.cval{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;line-height:1;text-align:center;}
+.cbar{width:100%;height:3px;border-radius:2px;background:var(--border2);overflow:hidden;}
+.cfill{height:100%;border-radius:2px;transition:width .3s,background .3s;}
+
+/* WARNING */
+#warn-box{display:none;padding:7px 14px;text-align:center;}
+#warn-box.is-red{background:rgba(255,68,68,.08);border:1px solid rgba(255,68,68,.4);border-top:none;}
+#warn-box.is-yellow{background:rgba(255,171,0,.08);border:1px solid rgba(255,171,0,.4);border-top:none;}
+#warn-txt{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:1px;line-height:1.7;}
+#impossible-box{display:none;padding:8px 14px;text-align:center;
+  background:rgba(170,68,255,.08);border:1px solid rgba(170,68,255,.5);border-top:none;}
+#impossible-txt{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:1px;
+  line-height:1.8;color:#aa44ff;}
+
+/* CANVAS */
+.ecg-wrap{background:#040608;border:1px solid var(--border);border-top:none;}
+#ecg-canvas{display:block;width:100%;}
+
+/* WAVE LEGEND */
+.wlegend{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);}
+.wc{background:var(--metal);padding:7px 5px;text-align:center;}
+.wl{font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--dim);letter-spacing:1px;margin-bottom:3px;}
+.wv{font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:600;line-height:1.3;transition:color .3s;}
+
+/* PATTERN BUTTONS */
+.pwrap{background:var(--panel);border:1px solid var(--border);border-top:none;padding:12px 14px;}
+.ptitle{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--dim);letter-spacing:3px;margin-bottom:10px;}
+.pgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;}
+.pbtn{background:var(--border2);border:2px solid var(--border);color:var(--dim);
+  border-radius:4px;padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:9px;
+  letter-spacing:1px;cursor:pointer;text-align:center;line-height:1.4;
+  -webkit-appearance:none;appearance:none;width:100%;-webkit-tap-highlight-color:transparent;}
+.pbtn.on{background:rgba(100,100,100,.1);}
+.psub{font-size:7px;color:var(--dim);margin-top:2px;letter-spacing:0;}
+.pbtn.on .psub{opacity:.7;}
+.yb{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:7px;
+  padding:1px 5px;border-radius:2px;letter-spacing:1px;margin-right:3px;}
+.y12{background:rgba(68,136,255,.15);color:#4488ff;border:1px solid rgba(68,136,255,.35);}
+.y34{background:rgba(170,68,255,.15);color:#aa44ff;border:1px solid rgba(170,68,255,.35);}
+.y5{background:rgba(255,107,53,.15);color:#ff6b35;border:1px solid rgba(255,107,53,.35);}
+
+/* CONTROLS */
+.cwrap{background:var(--panel);border:1px solid var(--border);border-top:none;padding:14px;}
+.shdr{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.sline{flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent);}
+.stitle{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:3px;white-space:nowrap;}
+
+.pcard{background:var(--metal);border:1px solid var(--border2);border-radius:6px;padding:12px 14px;margin-bottom:10px;position:relative;}
+.pcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:6px 6px 0 0;}
+.pc-red::before{background:linear-gradient(90deg,var(--red),transparent);}
+.pc-amber::before{background:linear-gradient(90deg,var(--yellow),transparent);}
+.phdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+.pname{font-family:'Rajdhani',sans-serif;font-weight:600;font-size:13px;color:var(--mid);letter-spacing:2px;text-transform:uppercase;}
+.prange{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--dim);margin-top:2px;}
+.pval{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;line-height:1;}
+.punit{font-size:11px;color:var(--dim);margin-left:2px;}
+
+/* SLIDER */
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  display:block;width:100%;height:8px;
+  border-radius:4px;outline:none;border:none;
+  background:var(--border2);
+  cursor:pointer;
+  touch-action:none;
+  -webkit-user-select:none;user-select:none;
+}
+input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:var(--border2);border:none;}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:36px;height:36px;border-radius:50%;
+  margin-top:-14px;cursor:pointer;border:3px solid #000;
+}
+input.sl-red::-webkit-slider-thumb{background:var(--red);box-shadow:0 0 10px rgba(255,68,68,.6);}
+input.sl-amber::-webkit-slider-thumb{background:var(--yellow);box-shadow:0 0 10px rgba(255,171,0,.6);}
+input[type=range]::-moz-range-track{height:8px;border-radius:4px;background:var(--border2);border:none;}
+input[type=range]::-moz-range-thumb{width:30px;height:30px;border-radius:50%;border:3px solid #000;cursor:pointer;}
+input.sl-red::-moz-range-thumb{background:var(--red);}
+input.sl-amber::-moz-range-thumb{background:var(--yellow);}
+.slbls{display:flex;justify-content:space-between;margin-top:4px;}
+.slbls span{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);}
+
+/* DIAGNOSIS */
+.diag{border:1px solid var(--border2);border-radius:6px;overflow:hidden;margin-top:4px;}
+.dhdr{padding:12px 14px;display:flex;align-items:center;gap:10px;}
+.ddot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.dtitle{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:17px;letter-spacing:2px;text-transform:uppercase;}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);}
+.dc{background:var(--metal);padding:10px 12px;}
+.dcf{background:var(--metal);padding:10px 12px;grid-column:1/-1;}
+.dl{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--dim);letter-spacing:2px;margin-bottom:4px;}
+.dv{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:500;line-height:1.55;}
+
+.footer{display:flex;justify-content:space-between;margin-top:12px;padding:0 4px;}
+.footer span{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--dim);letter-spacing:2px;}
+
+@media(min-width:768px){
+  .wrap{padding:20px 24px;}
+  .pgrid{grid-template-columns:repeat(3,1fr);}
+  .wv{font-size:13px;}
+  .dv{font-size:15px;}
+  .pval{font-size:30px;}
+}
+@media(min-width:1024px){
+  .pgrid{grid-template-columns:repeat(4,1fr);}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hdr">
+  <div>
+    <div class="brand">BHARAT MED PULSE · PHYSIOLOGY LAB</div>
+    <div class="htitle">ECG <span>SIMULATOR</span></div>
+  </div>
+  <div class="hright">
+    <div class="dot"></div>
+    <div class="badge">CARDIOLOGY · Y1–Y5</div>
+    <div class="badge" style="margin-top:2px;">RHYTHM · CONDUCTION · ION</div>
+  </div>
+</div>
+
+<div class="chips">
+  <div class="chip"><div class="clbl">RHYTHM</div><div class="cval" id="c-rhythm">NSR</div><div class="cbar"><div class="cfill" id="cf-rhythm"></div></div></div>
+  <div class="chip"><div class="clbl">K⁺ LEVEL</div><div class="cval" id="c-k">4.2 mM</div><div class="cbar"><div class="cfill" id="cf-k"></div></div></div>
+  <div class="chip"><div class="clbl">ISCHEMIA</div><div class="cval" id="c-isch">ABSENT</div><div class="cbar"><div class="cfill" id="cf-isch"></div></div></div>
+  <div class="chip"><div class="clbl">CONDUCTION</div><div class="cval" id="c-cond">NORMAL</div><div class="cbar"><div class="cfill" id="cf-cond"></div></div></div>
+</div>
+
+<div id="warn-box"><span id="warn-txt"></span></div>
+<div id="impossible-box">
+  <span id="impossible-txt"></span>
+</div>
+
+<div class="ecg-wrap"><canvas id="ecg-canvas" width="700" height="220"></canvas></div>
+
+<div class="wlegend">
+  <div class="wc"><div class="wl">P WAVE</div><div class="wv" id="w-p">Normal</div></div>
+  <div class="wc"><div class="wl">PR INTERVAL</div><div class="wv" id="w-pr">Normal</div></div>
+  <div class="wc"><div class="wl">QRS</div><div class="wv" id="w-qrs">Narrow</div></div>
+  <div class="wc"><div class="wl">ST SEGMENT</div><div class="wv" id="w-st">Isoelectric</div></div>
+  <div class="wc"><div class="wl">T WAVE</div><div class="wv" id="w-t">Upright</div></div>
+</div>
+
+<div class="pwrap">
+  <div class="ptitle">SELECT RHYTHM / PATTERN</div>
+  <div class="pgrid">
+    <button class="pbtn" data-p="nsr">NORMAL SINUS RHYTHM<div class="psub"><span class="yb y12">Y1–Y2</span>Baseline</div></button>
+    <button class="pbtn" data-p="tachy">SINUS TACHYCARDIA<div class="psub"><span class="yb y12">Y1–Y2</span>HR &gt; 100</div></button>
+    <button class="pbtn" data-p="brady">SINUS BRADYCARDIA<div class="psub"><span class="yb y12">Y1–Y2</span>HR &lt; 60</div></button>
+    <button class="pbtn" data-p="av1">1° AV BLOCK<div class="psub"><span class="yb y12">Y1–Y2</span>Long PR</div></button>
+    <button class="pbtn" data-p="wenck">WENCKEBACH (MOBITZ I)<div class="psub"><span class="yb y34">Y3–Y4</span>PR lengthens→drop</div></button>
+    <button class="pbtn" data-p="mobitz2">MOBITZ II (2° AVB)<div class="psub"><span class="yb y34">Y3–Y4</span>Fixed drop</div></button>
+    <button class="pbtn" data-p="chb">COMPLETE HEART BLOCK<div class="psub"><span class="yb y34">Y3–Y4</span>True dissociation</div></button>
+    <button class="pbtn" data-p="af">ATRIAL FIBRILLATION<div class="psub"><span class="yb y34">Y3–Y4</span>Irregularly irregular</div></button>
+    <button class="pbtn" data-p="lbbb">LEFT BUNDLE BRANCH BLOCK<div class="psub"><span class="yb y5">Y4–Y5</span>Wide QRS, notched</div></button>
+    <button class="pbtn" data-p="rbbb">RIGHT BUNDLE BRANCH BLOCK<div class="psub"><span class="yb y5">Y4–Y5</span>RSR' pattern</div></button>
+    <button class="pbtn" data-p="ischemia">MYOCARDIAL ISCHAEMIA<div class="psub"><span class="yb y34">Y3–Y5</span>ST depression</div></button>
+    <button class="pbtn" data-p="stemi">STEMI PATTERN<div class="psub"><span class="yb y5">Y4–Y5</span>ST elevation</div></button>
+  </div>
+</div>
+
+<div class="cwrap">
+  <div class="shdr"><div class="stitle">HEART RATE</div><div class="sline"></div></div>
+  <div class="pcard pc-red">
+    <div class="phdr">
+      <div><div class="pname">Heart Rate</div><div class="prange">NORMAL: 60–100 bpm</div></div>
+      <div><span class="pval" id="hr-val">75</span><span class="punit">bpm</span></div>
+    </div>
+    <input type="range" class="sl-red" id="hr-slider" min="30" max="160" step="1" value="75">
+    <div class="slbls"><span>30</span><span>160 bpm</span></div>
+  </div>
+
+  <div class="shdr" style="margin-top:8px;"><div class="stitle">POTASSIUM (K⁺)</div><div class="sline"></div></div>
+  <div class="pcard pc-amber">
+    <div class="phdr">
+      <div><div class="pname">Potassium K⁺</div><div class="prange">NORMAL: 3.5–5.0 mmol/L</div></div>
+      <div><span class="pval" id="k-val">4.2</span><span class="punit">mM</span></div>
+    </div>
+    <input type="range" class="sl-amber" id="k-slider" min="25" max="80" step="1" value="42">
+    <div class="slbls"><span>2.5 hypoK</span><span>8.0 hyperK</span></div>
+  </div>
+
+  <!-- K+ EFFECT PANEL - appears right after K slider -->
+  <div id="k-effect" style="display:none;border-radius:6px;padding:10px 14px;margin-bottom:10px;border:1px solid #333;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:2px;color:#666;margin-bottom:6px;">K⁺ ECG EFFECTS</div>
+    <div id="k-effect-txt" style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;line-height:1.6;"></div>
+  </div>
+
+  <div class="shdr" style="margin-top:8px;"><div class="stitle">INTERPRETATION</div><div class="sline"></div></div>
+  <div class="diag" id="diag-panel">
+    <div class="dhdr"><div class="ddot" id="d-dot"></div><div class="dtitle" id="d-title">NORMAL SINUS RHYTHM</div></div>
+    <div class="dgrid">
+      <div class="dc"><div class="dl">RATE / RHYTHM</div><div class="dv" id="d-rate"></div></div>
+      <div class="dc"><div class="dl">KEY FINDING</div><div class="dv" id="d-key"></div></div>
+      <div class="dcf"><div class="dl">MECHANISM</div><div class="dv" id="d-mech"></div></div>
+      <div class="dcf" style="background:rgba(0,0,0,.2);border-top:1px solid var(--border);">
+        <div class="dl" id="d-causes-lbl">⚕ CLINICAL / EXAM RECALL</div>
+        <div class="dv" id="d-causes"></div>
+      </div>
+      <div class="dcf" style="border-top:1px solid var(--border);">
+        <div class="dl">INTERVALS</div>
+        <div class="dv" id="d-iv" style="color:var(--dim);"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer"><span>BHARAT MED PULSE</span><span>PHYSIOLOGY LAB · Y1–Y5</span></div>
+</div>
+
+<script>
+// iOS DEBUG - catch ALL errors
+window.onerror = function(msg, src, line, col, err){
+  document.body.insertAdjacentHTML('afterbegin',
+    '<div style="position:fixed;top:0;left:0;right:0;z-index:9999;background:red;color:#fff;font-size:11px;padding:8px;font-family:monospace;word-break:break-all;">'
+    +'ERROR: '+msg+'<br>Line: '+line+'<br>'+(err?err.stack:'')+'</div>'
+  );
+  return false;
+};
+// ── STATE ─────────────────────────────────────────────────────────
+var pat = 'nsr';
+var hr  = 75;
+var kk  = 4.2;
+
+// ── CANVAS ────────────────────────────────────────────────────────
+var canvas = document.getElementById('ecg-canvas');
+var ctx    = canvas.getContext('2d');
+var DPR    = 1; // Force 1:1 - avoids iOS Safari DPR scaling bugs
+var CW, CH;
+
+function resizeCanvas(){
+  CW = canvas.offsetWidth || 700;
+  if(CW < 50) CW = 700;
+  CH = CW >= 700 ? 280 : CW >= 480 ? 250 : 220;
+  canvas.width  = CW;
+  canvas.height = CH;
+}
+// resizeCanvas called in init after DOM ready
+
+// ── GAUSSIAN ──────────────────────────────────────────────────────
+function G(x, mu, sig, amp){
+  return amp * Math.exp(-Math.pow(x-mu,2)/(2*sig*sig));
+}
+
+// ── K MODIFIERS ───────────────────────────────────────────────────
+function KM(){
+  var ex = Math.max(0, kk - 4.5);
+  var df = Math.max(0, 3.5 - kk);
+  return {
+    pSc:  Math.max(0.12, 1 - 0.28*ex),
+    tSc:  1 + 0.28*ex - 0.25*df,
+    tNar: Math.max(0.4, 1 - 0.18*ex),
+    qW:   1 + 0.22*ex,
+    prEx: 0.025*ex,
+    uAmp: kk < 3.5 ? Math.min(0.10, 0.07*(3.5-kk)) : 0
+  };
+}
+
+// ── WAVEFORM FUNCTIONS ────────────────────────────────────────────
+function sinusBeat(x, cy, qAt, m, isch){
+  var pAt=qAt-0.20*cy, tAt=qAt+0.30*cy;
+  var pA=0.13*m.pSc, qA=isch?-0.22:-0.11, tA=isch?-0.18:0.33*m.tSc;
+  var y=0;
+  if(pAt>=0&&pAt<cy) y+=G(x,pAt,0.038*cy,pA);
+  y+=G(x,qAt-0.025*cy,0.008*cy,qA);
+  y+=G(x,qAt,0.016*cy*m.qW,1.0);
+  y+=G(x,qAt+0.028*cy,0.010*cy,-0.20);
+  if(x>qAt+0.055*cy&&x<qAt+0.22*cy) y+=isch?-0.16:0;
+  if(tAt<cy) y+=G(x,tAt,0.075*cy*m.tNar,tA);
+  if(m.uAmp>0){var uAt=tAt+0.19*cy; if(uAt<cy) y+=G(x,uAt,0.042*cy,m.uAmp);}
+  return y;
+}
+function lbbbBeat(x,cy,qAt){
+  var pAt=qAt-0.20*cy,tAt=qAt+0.34*cy,sig=0.030*cy,y=0;
+  if(pAt>=0) y+=G(x,pAt,0.038*cy,0.13);
+  y+=G(x,qAt-0.010*cy,sig*0.6,-0.15);
+  y+=G(x,qAt+0.008*cy,sig,0.70);
+  y+=G(x,qAt+0.030*cy,sig*0.7,0.55);
+  y+=G(x,qAt+0.048*cy,sig*0.5,-0.18);
+  if(tAt<cy) y+=G(x,tAt,0.07*cy,-0.22);
+  return y;
+}
+function rbbbBeat(x,cy,qAt){
+  var pAt=qAt-0.20*cy,tAt=qAt+0.32*cy,sig=0.026*cy,y=0;
+  if(pAt>=0) y+=G(x,pAt,0.038*cy,0.13);
+  y+=G(x,qAt-0.010*cy,sig*0.5,0.30);
+  y+=G(x,qAt+0.010*cy,sig*0.6,-0.35);
+  y+=G(x,qAt+0.038*cy,sig*0.7,0.80);
+  y+=G(x,qAt+0.060*cy,sig*0.5,-0.18);
+  if(tAt<cy) y+=G(x,tAt,0.07*cy,0.28);
+  return y;
+}
+function afVal(t){
+  var m=KM(), baseC=60/hr;
+  var rr=[1.0,1.35,0.75,1.15,0.88,1.42,0.70,1.20,0.95,1.30,0.78,1.10,1.38,0.82,1.05];
+  var cumT=0,bStart=0,bIdx=0;
+  for(var i=0;i<rr.length*3;i++){
+    var r=baseC*rr[i%rr.length];
+    if(cumT+r>t){bStart=cumT;bIdx=i;break;}
+    cumT+=r;
+  }
+  var lT=t-bStart, bCy=baseC*rr[bIdx%rr.length], x=lT;
+  var y=0.035*Math.sin(2*Math.PI*t*6.5)+0.025*Math.sin(2*Math.PI*t*8.2+1.1)+0.018*Math.sin(2*Math.PI*t*11.3+2.3);
+  var qAt=0.35*bCy,tAt=qAt+0.28*bCy;
+  y+=G(x,qAt-0.020*bCy,0.007*bCy,-0.10);
+  y+=G(x,qAt,0.015*bCy*m.qW,1.0);
+  y+=G(x,qAt+0.022*bCy,0.009*bCy,-0.20);
+  if(tAt<bCy) y+=G(x,tAt,0.065*bCy*m.tNar,0.30*m.tSc);
+  return y;
+}
+function wenckVal(x,cy,bi){
+  var seq=bi%4, delays=[0.04,0.09,0.16,null], d=delays[seq];
+  var pAt=0.15*cy, y=G(x,pAt,0.035*cy,0.13);
+  if(d!==null){
+    var qAt=pAt+0.14*cy+d*cy, tAt=Math.min(qAt+0.28*cy,cy-0.08*cy);
+    y+=G(x,qAt-0.022*cy,0.007*cy,-0.10);
+    y+=G(x,qAt,0.016*cy,1.0);
+    y+=G(x,qAt+0.024*cy,0.009*cy,-0.20);
+    y+=G(x,tAt,0.070*cy,0.32);
+  }
+  return y;
+}
+function chbVal(t){
+  var m=KM(), aCy=60/hr, vCy=60/35;
+  var ax=((t%aCy)+aCy)%aCy, vx=((t%vCy)+vCy)%vCy;
+  var y=G(ax,0.30*aCy,0.035*aCy,0.13*m.pSc);
+  var qAt=0.40*vCy, tAt=Math.min(qAt+0.30*vCy,vCy-0.10*vCy);
+  y+=G(vx,qAt-0.022*vCy,0.008*vCy,-0.10);
+  y+=G(vx,qAt,0.018*vCy*m.qW,1.0);
+  y+=G(vx,qAt+0.026*vCy,0.010*vCy,-0.22);
+  y+=G(vx,tAt,0.08*vCy*m.tNar,0.30*m.tSc);
+  return y+0.012*Math.sin(2*Math.PI*t/5.5);
+}
+function stemiVal(x,cy,qAt,m){
+  var pAt=qAt-0.20*cy, tAt=qAt+0.32*cy, y=0;
+  if(pAt>=0) y+=G(x,pAt,0.038*cy,0.13*m.pSc);
+  y+=G(x,qAt-0.030*cy,0.018*cy,-0.35);
+  y+=G(x,qAt,0.016*cy,0.80);
+  y+=G(x,qAt+0.024*cy,0.010*cy,-0.15);
+  if(x>qAt+0.040*cy&&x<qAt+0.200*cy) y+=0.28;
+  if(tAt<cy) y+=G(x,tAt,0.06*cy,0.55);
+  return y;
+}
+function ecgVal(t){
+  var m=KM(), cy=60/hr, base=0.012*Math.sin(2*Math.PI*t/6.8);
+  if(pat==='af') return base+afVal(t);
+  if(pat==='chb') return base+chbVal(t);
+  var x=((t%cy)+cy)%cy, bi=Math.floor(t/cy);
+  if(pat==='wenck') return base+wenckVal(x,cy,bi);
+  if(pat==='mobitz2'){
+    var m2=KM(), pAt2=0.15*cy, qAt2=0.36*cy, drop=bi%3===2;
+    var y2=G(x,pAt2,0.035*cy,0.13*m2.pSc);
+    if(!drop){
+      y2+=G(x,qAt2-0.025*cy,0.008*cy,-0.11);
+      y2+=G(x,qAt2,0.016*cy,1.0);
+      y2+=G(x,qAt2+0.028*cy,0.010*cy,-0.20);
+      y2+=G(x,Math.min(qAt2+0.30*cy,cy-0.08*cy),0.075*cy,0.33);
+    }
+    return base+y2;
+  }
+  if(pat==='lbbb') return base+lbbbBeat(x,cy,0.38*cy);
+  if(pat==='rbbb') return base+rbbbBeat(x,cy,0.38*cy);
+  var m3=KM(), qAt3=0.38*cy+(pat==='av1'?0.065*cy:0)+m3.prEx*cy;
+  if(pat==='stemi') return base+stemiVal(x,cy,qAt3,m3);
+  return base+sinusBeat(x,cy,qAt3,m3,pat==='ischemia');
+}
+
+// ── TRACE COLOR ───────────────────────────────────────────────────
+function traceColor(){
+  if(['chb','stemi','lbbb','af','mobitz2','wenck','ischemia'].indexOf(pat)>=0) return '#ff4444';
+  if(kk>6.0||kk<2.5||hr>130||hr<40) return '#ff4444';
+  if(['av1','rbbb','tachy','brady'].indexOf(pat)>=0) return '#ffab00';
+  if(kk>5.0||kk<3.5||hr>100||hr<60) return '#ffab00';
+  return '#00e676';
+}
+
+// ── DRAW ECG ──────────────────────────────────────────────────────
+function redraw(){
+  var W=CW, H=CH;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#040608'; ctx.fillRect(0,0,W,H);
+  var gs=18;
+  ctx.beginPath(); ctx.strokeStyle='rgba(190,18,60,.07)'; ctx.lineWidth=0.6;
+  for(var xi=0;xi<=W;xi+=gs) if(xi%(gs*5)!==0){ctx.moveTo(xi,0);ctx.lineTo(xi,H);}
+  for(var yi=0;yi<=H;yi+=gs) if(yi%(gs*5)!==0){ctx.moveTo(0,yi);ctx.lineTo(W,yi);}
+  ctx.stroke();
+  ctx.beginPath(); ctx.strokeStyle='rgba(190,18,60,.2)'; ctx.lineWidth=1;
+  for(var xi2=0;xi2<=W;xi2+=gs) if(xi2%(gs*5)===0){ctx.moveTo(xi2,0);ctx.lineTo(xi2,H);}
+  for(var yi2=0;yi2<=H;yi2+=gs) if(yi2%(gs*5)===0){ctx.moveTo(0,yi2);ctx.lineTo(W,yi2);}
+  ctx.stroke();
+  var mid=H/2;
+  ctx.beginPath(); ctx.strokeStyle='rgba(190,18,60,.18)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.moveTo(0,mid); ctx.lineTo(W,mid); ctx.stroke(); ctx.setLineDash([]);
+  var tc=traceColor();
+  ctx.beginPath(); ctx.strokeStyle=tc; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.lineCap='round';
+  for(var i=0;i<=W;i++){
+    var yv=mid-ecgVal(i/W*7)*72;
+    if(i===0) ctx.moveTo(i,yv); else ctx.lineTo(i,yv);
+  }
+  ctx.stroke();
+}
+
+// ── PATTERN DATA ──────────────────────────────────────────────────
+var PD={
+  nsr:{color:'#00e676',title:'NORMAL SINUS RHYTHM',rate:'Regular sinus rhythm',key:'P→QRS→T every beat, all intervals normal',
+    mech:'SA node → AV node → Bundle of His → Bundle branches → Purkinje fibres → Ventricles. Normal P before every QRS.',
+    causes:'Learn this first. P=atrial depol. QRS=ventricular depol. T=ventricular repol. Atrial repolarisation hidden inside QRS.',
+    iv:'PR: 120–200ms · QRS: <120ms · QTc: <440ms',
+    p:'Normal',pC:'#00e676',pr:'Normal 120–200ms',prC:'#00e676',qrs:'Narrow <120ms',qrsC:'#00e676',st:'Isoelectric',stC:'#00e676',t:'Upright',tC:'#00e676'},
+  tachy:{color:'#ffab00',title:'SINUS TACHYCARDIA',rate:'Regular, HR > 100 bpm',key:'Short RR, normal P-QRS-T morphology',
+    mech:'SA node firing fast. Every P followed by QRS. RR shortens. Diastolic filling time reduces at very high rates.',
+    causes:'CAUSES: Pain, Fever, Hypovolaemia, Anaemia, Hypoxia, Hyperthyroidism, PE, Anxiety, Drugs. Sinus tachy = always a symptom — treat the cause.',
+    iv:'PR: normal · QRS: narrow · Rate: >100 bpm',
+    p:'Normal',pC:'#00e676',pr:'Normal',prC:'#00e676',qrs:'Narrow',qrsC:'#00e676',st:'Isoelectric',stC:'#00e676',t:'Upright',tC:'#00e676'},
+  brady:{color:'#ffab00',title:'SINUS BRADYCARDIA',rate:'Regular, HR < 60 bpm',key:'Long RR, normal P-QRS-T morphology',
+    mech:'SA node firing slowly. Normal intervals. Long TP segment visible. Physiological in athletes due to high vagal tone.',
+    causes:'CAUSES: Athletes (physiological), Hypothyroidism, ↑ICP (Cushing reflex), Inferior MI, Beta-blockers, Digoxin, Sick sinus syndrome.',
+    iv:'PR: normal · QRS: narrow · Rate: <60 bpm',
+    p:'Normal',pC:'#00e676',pr:'Normal',prC:'#00e676',qrs:'Narrow',qrsC:'#00e676',st:'Isoelectric',stC:'#00e676',t:'Upright',tC:'#00e676'},
+  av1:{color:'#ffab00',title:'1° AV BLOCK',rate:'Regular, HR as set',key:'PR interval > 200ms, every P still conducts',
+    mech:'AV node conducts every impulse but slowly. PR > 200ms = >1 large square on ECG. All P waves followed by QRS — no dropped beats.',
+    causes:'Often benign. Inferior MI, Rheumatic fever, Lyme disease, Digoxin, Beta-blockers. Can progress to higher-degree block.',
+    iv:'PR: >200ms · QRS: normal · No dropped beats',
+    p:'Normal',pC:'#00e676',pr:'PROLONGED >200ms',prC:'#ffab00',qrs:'Narrow',qrsC:'#00e676',st:'Isoelectric',stC:'#00e676',t:'Upright',tC:'#00e676'},
+  wenck:{color:'#ff4444',title:'MOBITZ I — WENCKEBACH',rate:'Irregular — grouped beating',key:'PR progressively lengthens then one QRS drops',
+    mech:'Progressive AV nodal fatigue. PR lengthens until one P fails to conduct. QRS drops. Cycle resets. Block within AV node — usually reversible.',
+    causes:'Inferior MI (RCA supplies AV node), Digoxin, Myocarditis. Generally benign vs Mobitz II. Usually does NOT need pacemaker.',
+    iv:'PR: progressively longer → QRS drops → resets',
+    p:'Present every beat',pC:'#00e676',pr:'Progressive lengthening',prC:'#ff4444',qrs:'Narrow (when present)',qrsC:'#ffab00',st:'Normal',stC:'#00e676',t:'Normal',tC:'#00e676'},
+  mobitz2:{color:'#ff4444',title:'MOBITZ II — 2° AV BLOCK',rate:'Irregular — sudden dropped beats',key:'Fixed PR then sudden QRS dropout — no warning',
+    mech:'Block below AV node (His/bundle branches). PR fixed. Suddenly P fails to conduct. Dangerous — can progress to complete heart block without warning.',
+    causes:'Anterior MI (LAD damages bundle branches), Lenègre disease. NEEDS PACEMAKER — risk of sudden CHB and syncope.',
+    iv:'PR: fixed → sudden dropped QRS → repeats',
+    p:'Present (some not conducted)',pC:'#ffab00',pr:'Fixed, then absent',prC:'#ff4444',qrs:'Absent periodically',qrsC:'#ff4444',st:'Normal',stC:'#00e676',t:'Normal',tC:'#00e676'},
+  chb:{color:'#ff4444',title:'COMPLETE HEART BLOCK (3° AVB)',rate:'Atria ~75/min · Ventricles ~35/min — INDEPENDENT',key:'P and QRS march independently — NO relationship',
+    mech:'AV node completely fails. Atria at sinus rate (~75/min). Ventricles at escape rate (~35/min). P waves and QRS totally dissociated.',
+    causes:'EMERGENCY: Inferior MI (RCA), Anterior MI (bilateral BBB), Digoxin toxicity, Lyme disease. Rx: Temporary pacing → Permanent pacemaker.',
+    iv:'Atrial rate ≠ ventricular rate — NO PR relationship',
+    p:'Present at own rate ~75/min',pC:'#ff4444',pr:'NO fixed PR — varies constantly',prC:'#ff4444',qrs:'Wide escape ~35/min',qrsC:'#ff4444',st:'Variable',stC:'#ffab00',t:'Variable',tC:'#ffab00'},
+  af:{color:'#ff4444',title:'ATRIAL FIBRILLATION',rate:'IRREGULARLY IRREGULAR — no pattern',key:'No P waves — chaotic baseline, irregular QRS',
+    mech:'Multiple re-entrant atrial circuits at 350–600/min. AV node conducts randomly → irregularly irregular QRS. No organised P waves — fibrillatory (f) waves.',
+    causes:'PIRATES: Pulmonary (PE/COPD), Ischaemia, Rheumatic (mitral stenosis), Age, Thyrotoxicosis, Ethanol (holiday heart), Surgery. CHA₂DS₂-VASc for anticoagulation.',
+    iv:'No PR measurable · QRS narrow · RR completely irregular',
+    p:'ABSENT — fibrillatory baseline',pC:'#ff4444',pr:'NOT MEASURABLE',prC:'#ff4444',qrs:'Narrow, irregular',qrsC:'#ffab00',st:'Variable',stC:'#ffab00',t:'Variable',tC:'#ffab00'},
+  lbbb:{color:'#ff4444',title:'LEFT BUNDLE BRANCH BLOCK',rate:'Regular, HR as set',key:'Broad notched R — QRS >120ms, discordant T',
+    mech:'Left bundle fails. Septum activated R→L (reversed). LV activated late. QRS >120ms. Discordant T waves (opposite to QRS). WILLIAM: W in V1, M in V5-V6.',
+    causes:'ALWAYS PATHOLOGICAL. IHD (most common), Hypertension/LVH, Aortic stenosis, Cardiomyopathy. NEW LBBB = treat as STEMI equivalent.',
+    iv:'QRS: >120ms · T wave discordant (opposite to QRS)',
+    p:'Normal',pC:'#00e676',pr:'Normal',prC:'#00e676',qrs:'WIDE >120ms, notched',qrsC:'#ff4444',st:'Discordant depression',stC:'#ffab00',t:'INVERTED (discordant)',tC:'#ff4444'},
+  rbbb:{color:'#ffab00',title:'RIGHT BUNDLE BRANCH BLOCK',rate:'Regular, HR as set',key:"RSR' in V1 (rabbit ears) — QRS >120ms",
+    mech:"Right bundle fails. RV activated late. RSR' in V1 (M-shape). Broad terminal S in I, aVL, V5-V6. MARROW: M in V1, W in V5-V6.",
+    causes:'Can be normal variant (partial RBBB). PE, ASD, pulmonary hypertension, Brugada. Less concerning than LBBB.',
+    iv:"QRS: >120ms · RSR' in V1 · Broad S in I, V5-V6",
+    p:'Normal',pC:'#00e676',pr:'Normal',prC:'#00e676',qrs:"WIDE >120ms, RSR'",qrsC:'#ffab00',st:'Normal/isoelectric',stC:'#00e676',t:'Inverted V1-V3 (discordant)',tC:'#ffab00'},
+  ischemia:{color:'#ff4444',title:'MYOCARDIAL ISCHAEMIA — NSTEMI',rate:'Regular, HR as set',key:'ST depression + T wave inversion',
+    mech:'Subendocardial ischaemia: demand > supply. ST depresses ≥1mm in ≥2 contiguous leads. T inverts. No ST elevation. Troponin rise = NSTEMI.',
+    causes:'ACS: Unstable angina (no troponin) → NSTEMI (troponin+, no STE) → STEMI (STE+). Mx: MONA + Clopidogrel + LMWH → angiography.',
+    iv:'ST: depressed ≥1mm · T: inverted · QRS: normal',
+    p:'Normal',pC:'#00e676',pr:'Normal',prC:'#00e676',qrs:'Narrow',qrsC:'#00e676',st:'DEPRESSED ↓',stC:'#ff4444',t:'INVERTED ↓',tC:'#ff4444'},
+  stemi:{color:'#ff4444',title:'STEMI — ST ELEVATION MI',rate:'Regular, HR as set',key:'ST elevation ≥1mm + pathological Q waves',
+    mech:'Transmural infarction. ST elevation in ischaemic territory. Hyperacute T waves early. Pathological Q waves = irreversible scar.',
+    causes:'Anterior=LAD (V1-V4). Inferior=RCA (II,III,aVF). Lateral=LCx (I,aVL,V5-V6). PRIMARY PCI within 90 min. Thrombolysis if unavailable within 120 min.',
+    iv:'ST elevation ≥1-2mm · Pathological Q · Hyperacute T',
+    p:'Normal (early)',pC:'#00e676',pr:'Normal',prC:'#00e676',qrs:'Pathological Q waves',qrsC:'#ff4444',st:'ELEVATED ↑ (tombstone)',stC:'#ff4444',t:'Hyperacute tall T',tC:'#ff4444'}
+};
+
+var DEF_HR={nsr:75,tachy:120,brady:45,av1:70,wenck:65,mobitz2:65,chb:75,af:110,lbbb:70,rbbb:70,ischemia:85,stemi:90};
+
+// ── HELPERS ───────────────────────────────────────────────────────
+function T(id){ return document.getElementById(id); }
+function setTxt(id, txt, col){
+  var e=T(id); if(!e) return;
+  e.textContent = txt;
+  if(col) e.style.color = col;
+}
+function setFill(id, bg, w){
+  var e=T(id); if(!e) return;
+  e.style.background = bg;
+  e.style.width = w;
+}
+function kCol(v){ return v>6.0||v<2.5?'#ff4444':v>5.0||v<3.5?'#ffab00':'#00e676'; }
+function hCol(v){ return v>130||v<40?'#ff4444':v>100||v<60?'#ffab00':'#00e676'; }
+
+// ── HIGHLIGHT ACTIVE BUTTON ───────────────────────────────────────
+function setBtn(p){
+  var col = PD[p].color;
+  document.querySelectorAll('.pbtn').forEach(function(b){
+    var bp = b.getAttribute('data-p');
+    if(bp === p){
+      b.classList.add('on');
+      b.style.borderColor = col;
+      b.style.color = col;
+      b.style.background = 'rgba(128,128,128,0.1)';
+    } else {
+      b.classList.remove('on');
+      b.style.borderColor = '';
+      b.style.color = '';
+      b.style.background = '';
+    }
+  });
+}
+
+// ── UPDATE ALL DISPLAY ────────────────────────────────────────────
+function updateDisplay(){
+  var p=pat, k=kk, h=hr;
+  var tc=traceColor();
+  var pd=PD[p];
+
+  redraw();
+
+  // Chips
+  var rL={nsr:'NSR',tachy:'TACHY',brady:'BRADY',av1:'1°AVB',wenck:'WENCK',mobitz2:'MOB II',chb:'CHB',af:'AF',lbbb:'LBBB',rbbb:'RBBB',ischemia:'ISCH',stemi:'STEMI'};
+  setTxt('c-rhythm', rL[p], tc);
+  setFill('cf-rhythm', tc, tc==='#00e676'?'15%':tc==='#ffab00'?'55%':'90%');
+
+  var kc=kCol(k);
+  setTxt('c-k', k.toFixed(1)+' mM', kc);
+  setFill('cf-k', kc, ((k-2.5)/5.5*100)+'%');
+
+  var isIsch=p==='ischemia'||p==='stemi';
+  var ic=isIsch?'#ff4444':'#00e676';
+  setTxt('c-isch', p==='stemi'?'STEMI':isIsch?'PRESENT':'ABSENT', ic);
+  setFill('cf-isch', ic, isIsch?'100%':'5%');
+
+  var cL={nsr:'NORMAL',tachy:'NORMAL',brady:'NORMAL',av1:'1° BLK',wenck:'WENCK',mobitz2:'MOB II',chb:'COMPLETE',af:'AF',lbbb:'LBBB',rbbb:'RBBB',ischemia:'NORMAL',stemi:'NORMAL'};
+  var cc=['nsr','tachy','brady','ischemia','stemi'].indexOf(p)>=0?'#00e676':['av1','rbbb'].indexOf(p)>=0?'#ffab00':'#ff4444';
+  setTxt('c-cond', cL[p], cc);
+  setFill('cf-cond', cc, cc==='#00e676'?'5%':cc==='#ffab00'?'40%':'90%');
+
+  // HR and K readouts
+  setTxt('hr-val', h, hCol(h));
+  setTxt('k-val', k.toFixed(1), kc);
+
+  // Wave legend
+  var wP=pd.p,wPC=pd.pC,wPR=pd.pr,wPRC=pd.prC,wQRS=pd.qrs,wQRSC=pd.qrsC,wST=pd.st,wSTC=pd.stC,wT=pd.t,wTC=pd.tC;
+  var isSinus=['nsr','tachy','brady','av1','ischemia','stemi'].indexOf(p)>=0;
+  if(isSinus){
+    if(k>5.5){wP='Flat/absent';wPC='#ff4444';}
+    else if(k>5.0){wP='Low amplitude';wPC='#ffab00';}
+    else if(k<3.0){wP='Prominent';wPC='#ffab00';}
+    if(k>6.0){wQRS='Wide >120ms';wQRSC='#ff4444';}
+    else if(k>5.5){wQRS='Slightly wide';wQRSC='#ffab00';}
+    if(p!=='ischemia'&&p!=='stemi'){
+      if(k>6.0){wT='VERY PEAKED ↑';wTC='#ff4444';}
+      else if(k>5.0){wT='Tall peaked ↑';wTC='#ffab00';}
+      else if(k<3.0){wT='Flat/U waves';wTC='#ffab00';}
+    }
+  }
+  setTxt('w-p',wP,wPC); setTxt('w-pr',wPR,wPRC); setTxt('w-qrs',wQRS,wQRSC); setTxt('w-st',wST,wSTC); setTxt('w-t',wT,wTC);
+
+  // Warnings
+  var warns=[],sev='none';
+  var critP=['chb','stemi','mobitz2','lbbb','af','wenck','ischemia'];
+  if(critP.indexOf(p)>=0){warns.push('⚠ '+pd.title+' — '+pd.key);sev='red';}
+  if(h>130){warns.push('⚠ SEVERE TACHYCARDIA');sev='red';}
+  else if(h>100||p==='tachy'){if(sev==='none')sev='yellow';warns.push('⚠ TACHYCARDIA — HR >100 bpm');}
+  else if(h<40){warns.push('⚠ SEVERE BRADYCARDIA — HR <40');sev='red';}
+  else if(h<60){warns.push('⚠ BRADYCARDIA — HR <60 bpm');if(sev==='none')sev='yellow';}
+  if(k>7.0){warns.push('⚠ CRITICAL HYPERKALEMIA — arrest risk');sev='red';}
+  else if(k>6.0){if(sev==='none')sev='red';warns.push('⚠ SEVERE HYPERKALEMIA — wide QRS');}
+  else if(k>5.0){if(sev==='none')sev='yellow';warns.push('⚠ HYPERKALEMIA — peaked T');}
+  else if(k<2.5){warns.push('⚠ CRITICAL HYPOKALEMIA');sev='red';}
+  else if(k<3.5){if(sev==='none')sev='yellow';warns.push('⚠ HYPOKALEMIA — flat T, U waves');}
+  var wb=T('warn-box');
+  if(warns.length){wb.style.display='block';wb.className=sev==='red'?'is-red':'is-yellow';setTxt('warn-txt',warns.join(' · '),sev==='red'?'#ff4444':'#ffab00');}
+  else{wb.style.display='none';}
+
+  // ── IMPOSSIBLE COMBINATIONS ───────────────────────────────────
+  var impossible=[], ib=T('impossible-box'), it=T('impossible-txt');
+  if(ib&&it){
+    // 1. CHB + HR > 50 via slider
+    // In true CHB ventricular rate is ALWAYS ~35 bpm escape — cannot be driven faster
+    if(p==='chb' && h>50){
+      impossible.push('🚫 CHB + HR '+h+' bpm — IMPOSSIBLE');
+      impossible.push('True CHB: ventricles escape at ~35/min only');
+      impossible.push('AV node is completely blocked — atrial rate cannot drive ventricles');
+      impossible.push('HR slider here controls atrial rate only — educational override');
+    }
+    // 2. AF + HR < 40
+    // AF with HR <40 = complete AV block on top of AF (separate diagnosis)
+    if(p==='af' && h<40){
+      impossible.push('🚫 AF + HR '+h+' bpm — PHYSIOLOGICALLY EXTREME');
+      impossible.push('AF with HR <40 = AV block ON TOP of AF');
+      impossible.push('Indicates complete AV nodal block — not pure AF');
+      impossible.push('Clinically: Digoxin toxicity or Sick Sinus Syndrome');
+    }
+    // 3. AF + HR > 170
+    // AF with very fast ventricular rate = pre-excitation (WPW) — life threatening
+    if(p==='af' && h>170){
+      impossible.push('🚫 AF + HR '+h+' bpm — DANGER: WPW TERRITORY');
+      impossible.push('AF with HR >170 = suspect pre-excitation (WPW syndrome)');
+      impossible.push('Accessory pathway bypasses AV node — can cause VF');
+      impossible.push('NEVER give AV nodal blockers (Digoxin, Verapamil) — fatal');
+    }
+    // 4. Mobitz II + HR > 120
+    if(p==='mobitz2' && h>120){
+      impossible.push('🚫 MOBITZ II + HR '+h+' bpm — NEAR IMPOSSIBLE');
+      impossible.push('Mobitz II with tachycardia = extreme clinical rarity');
+      impossible.push('High rate + infranodal block = imminent complete heart block');
+      impossible.push('EMERGENCY: pacemaker immediately');
+    }
+    // 5. Wenckebach + HR > 130
+    if(p==='wenck' && h>130){
+      impossible.push('🚫 WENCKEBACH + HR '+h+' — PHYSIOLOGICALLY PARADOXICAL');
+      impossible.push('Wenckebach is caused by AV node fatigue at FAST rates');
+      impossible.push('At HR >130 you would expect higher-degree block, not Wenckebach');
+      impossible.push('Wenckebach typically occurs at HR 60–100');
+    }
+    // 6. LBBB + Narrow QRS (can't happen — LBBB IS wide QRS)
+    // This is implicit — no slider for QRS width, so skip
+    // 7. NSR + HR > 100 or < 60 (contradicts definition)
+    if(p==='nsr' && (h>100||h<60)){
+      impossible.push('🚫 NSR + HR '+(h>100?h+' bpm — NSR CANNOT BE >100':''+h+' bpm — NSR CANNOT BE <60'));
+      impossible.push('Normal Sinus Rhythm is DEFINED as regular rhythm at 60–100 bpm');
+      impossible.push('HR >100 = Sinus Tachycardia by definition');
+      impossible.push('HR <60 = Sinus Bradycardia by definition');
+    }
+    // 8. K+ extremes with any pattern - already in warnings, but add physiological note
+    if(k>=7.5){
+      impossible.push('🚫 K⁺ '+k.toFixed(1)+' mM — INCOMPATIBLE WITH LIFE');
+      impossible.push('K⁺ >7.5 mM causes sine wave ECG → VF → asystole');
+      impossible.push('Patient would be in cardiac arrest — not producing this ECG');
+      impossible.push('Emergency: IV Calcium, Insulin+Dextrose, Salbutamol, Dialysis');
+    }
+    if(k<=2.0){
+      impossible.push('🚫 K⁺ '+k.toFixed(1)+' mM — CRITICALLY INCOMPATIBLE WITH LIFE');
+      impossible.push('K⁺ <2.0 mM: severe muscle paralysis, respiratory failure');
+      impossible.push('Torsades de Pointes (TdP) → VF likely');
+      impossible.push('Emergency: IV KCl replacement + cardiac monitoring');
+    }
+
+    if(impossible.length){
+      ib.style.display='block';
+      it.innerHTML='⚡ PHYSIOLOGICALLY IMPOSSIBLE / EXTREME COMBINATION<br>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>'+impossible.join('<br>');
+    } else {
+      ib.style.display='none';
+    }
+  }
+
+  // K+ effect panel - right below K slider
+  var ke=T('k-effect'), kt=T('k-effect-txt');
+  if(ke&&kt){
+    var kLines=[], kCol2='#00e676', kBdr='rgba(0,230,118,.2)';
+    if(k>=7.0){kCol2='#ff4444';kBdr='rgba(255,68,68,.3)';kLines=['⚠ CRITICAL HYPERKALEMIA (≥7.0)','ECG: Sine wave, VF risk — EMERGENCY','T wave: Very tall peaked','P wave: Absent','QRS: Severely widened'];}
+    else if(k>=6.0){kCol2='#ff4444';kBdr='rgba(255,68,68,.25)';kLines=['⚠ SEVERE HYPERKALEMIA (6–7)','T wave: Tall peaked (tented)','P wave: Flat/absent','QRS: Widening — danger zone'];}
+    else if(k>=5.0){kCol2='#ffab00';kBdr='rgba(255,171,0,.2)';kLines=['MILD HYPERKALEMIA (5–6)','T wave: Tall peaked','PR: Slightly prolonged','QRS: Normal width'];}
+    else if(k<=2.5){kCol2='#ff4444';kBdr='rgba(255,68,68,.3)';kLines=['⚠ CRITICAL HYPOKALEMIA (≤2.5)','T wave: Flat/inverted','U wave: Prominent (after T)','Risk: TdP, VF'];}
+    else if(k<=3.5){kCol2='#ffab00';kBdr='rgba(255,171,0,.2)';kLines=['HYPOKALEMIA (2.5–3.5)','T wave: Flat','U wave: Visible','ST: Slight depression'];}
+    else{kLines=['NORMAL K⁺ (3.5–5.0)','No ECG changes','P, QRS, T — all normal'];}
+    ke.style.display='block';
+    ke.style.borderColor=kBdr;
+    ke.style.background=kCol2==='#00e676'?'rgba(0,230,118,.05)':kCol2==='#ffab00'?'rgba(255,171,0,.05)':'rgba(255,68,68,.05)';
+    kt.style.color=kCol2;
+    kt.innerHTML=kLines.join('<br>');
+  }
+
+  // Diagnosis
+  T('d-dot').style.background=pd.color;
+  T('d-dot').style.boxShadow='0 0 8px '+pd.color;
+  setTxt('d-title',pd.title,pd.color);
+  T('diag-panel').style.borderColor=pd.color+'44';
+  T('d-rate').textContent=pd.rate;
+  T('d-key').textContent=pd.key;
+  T('d-mech').textContent=pd.mech;
+  T('d-causes').textContent=pd.causes;
+  T('d-iv').textContent=pd.iv;
+  setTxt('d-causes-lbl','⚕ CLINICAL / EXAM RECALL',pd.color);
+}
+
+// ── SLIDER & BUTTON LOGIC ────────────────────────────────────────
+// All DOM vars assigned here - AFTER full DOM exists
+var hrSlider = T('hr-slider');
+var kSlider  = T('k-slider');
+
+// _prog flag: set true when WE change .value so input event is ignored
+var _prog = false;
+
+function doHR(val){
+  hr = Math.max(30, Math.min(160, Math.round(val)));
+  _prog = true; hrSlider.value = hr; _prog = false;
+  if(pat==='nsr'||pat==='tachy'||pat==='brady'){
+    pat = hr>100?'tachy':hr<60?'brady':'nsr';
+    setBtn(pat);
+  }
+  updateDisplay();
+}
+
+function doK(intVal){
+  kk = Math.max(2.5, Math.min(8.0, Math.round(intVal) / 10));
+  _prog = true; kSlider.value = Math.round(kk*10); _prog = false;
+  updateDisplay();
+}
+
+// Pattern buttons
+document.querySelectorAll('.pbtn').forEach(function(btn){
+  function handleBtnClick(){
+    pat = btn.getAttribute('data-p');
+    hr  = DEF_HR[pat] || 75;
+    _prog = true;
+    hrSlider.value = hr;
+    _prog = false;
+    setBtn(pat);
+    updateDisplay();
+  }
+  // click for desktop/Android, touchend for iOS
+  btn.addEventListener('click', handleBtnClick);
+  btn.addEventListener('touchend', function(e){
+    e.preventDefault(); // prevent ghost click
+    handleBtnClick();
+  });
+});
+
+// Desktop drag
+
+
+// Mobile touch
+function touchPct(el, e){
+  var t = e.touches[0] || e.changedTouches[0];
+  var r = el.getBoundingClientRect();
+  return Math.max(0, Math.min(1, (t.clientX - r.left) / r.width));
+}
+hrSlider.addEventListener('touchmove', function(e){
+  e.preventDefault();
+  doHR(30 + touchPct(this,e) * 130);
+}, {passive:false});
+hrSlider.addEventListener('touchend', function(e){
+  doHR(30 + touchPct(this,e) * 130);
+}, {passive:true});
+kSlider.addEventListener('touchmove', function(e){
+  e.preventDefault();
+  doK(25 + touchPct(this,e) * 55);
+}, {passive:false});
+kSlider.addEventListener('touchend', function(e){
+  doK(25 + touchPct(this,e) * 55);
+}, {passive:true});
+
+// ── INIT — wrapped in window.load for iOS Safari ─────────────────
+window.addEventListener('load', function(){
+  hrSlider = T('hr-slider');
+  kSlider  = T('k-slider');
+
+  resizeCanvas();
+  window.addEventListener('resize', function(){ resizeCanvas(); redraw(); });
+
+  hrSlider.addEventListener('input', function(){ if(!_prog) doHR(+this.value); });
+  kSlider.addEventListener('input',  function(){ if(!_prog) doK(+this.value); });
+
+  // touchmove for mobile
+  hrSlider.addEventListener('touchmove', function(e){
+    e.preventDefault();
+    doHR(30 + touchPct(this,e) * 130);
+  }, {passive:false});
+  hrSlider.addEventListener('touchend', function(e){
+    doHR(30 + touchPct(this,e) * 130);
+  }, {passive:true});
+  kSlider.addEventListener('touchmove', function(e){
+    e.preventDefault();
+    doK(25 + touchPct(this,e) * 55);
+  }, {passive:false});
+  kSlider.addEventListener('touchend', function(e){
+    doK(25 + touchPct(this,e) * 55);
+  }, {passive:true});
+
+  setBtn('nsr');
+  updateDisplay();
+});
+</script>
+</body>
+</html>
